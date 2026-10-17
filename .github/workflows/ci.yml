@@ -1,0 +1,28 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: alire-project/setup-alire@v3
+      - run: alr -n build
+  prove:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: alire-project/setup-alire@v3
+      - run: alr exec -P1 -- gnatprove -P prove_fluent.gpr --mode=silver --level=2 --checks-as-errors=on --warnings=continue
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: alire-project/setup-alire@v3
+      - run: alr -n build && gprbuild -P tests/tests.gpr && ./bin/test_m0
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opengrep/opengrep-action@v1

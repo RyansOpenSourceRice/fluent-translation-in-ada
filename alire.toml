@@ -1,0 +1,21 @@
+name = "fluent_translation_in_ada"
+description = "Project Fluent translation library in Ada"
+version = "0.1.0"
+tags = ["i18n", "l10n", "fluent", "ftl", "localization", "spark"]
+licenses = "Apache-2.0"
+website = "https://github.com/RyansOpenSourceRice/fluent-translation-in-ada"
+project-files = ["fluent_translation_in_ada.gpr"]
+
+authors = ["Ryan"]
+maintainers = ["Ryan <ryan@example.com>"]
+maintainers-logins = ["RyansOpenSourceRice"]
+
+[[depends-on]]
+gnat = ">=11"
+gprbuild = ">=22.0.0"
+
+[[depends-on]]
+vss_text = "^26.2.0"
+
+[[depends-on]]
+gnatprove = "^16.1.0"
