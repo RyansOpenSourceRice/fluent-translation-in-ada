@@ -18,18 +18,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
       - run: alr -n build && eval "$(alr printenv --unix)" && gprbuild -P examples/hello/hello.gpr && gprbuild -P examples/parse/parse.gpr && gprbuild -P examples/fallback/fallback.gpr
   prove:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
       - run: alr -n build && eval "$(alr printenv --unix)" && gnatprove -P prove_fluent.gpr --mode=silver --level=2 --checks-as-errors=on --warnings=continue --timeout=60
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
       - run: alr -n build && eval "$(alr printenv --unix)" && gprbuild -P tests/tests.gpr && ./bin/test_m0 && ./bin/test_m1a
   sast:
     runs-on: ubuntu-latest
