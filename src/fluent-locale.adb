@@ -15,7 +15,7 @@ is
          pragma Loop_Invariant (Len <= Max_Locale_Tag_Length);
          pragma Loop_Invariant (Result.Len = Len);
          pragma Loop_Invariant (Text'First <= Positive'Last - Max_Locale_Tag_Length);
-         Result.Text (K) := Text (Text'First + K - 1);
+         Result.Text (K) := Text (Text'First + (K - 1));
       end loop;
       return Result;
    end Make_Tag;
