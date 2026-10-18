@@ -260,8 +260,6 @@ is
          Buf : Identifier_Text := [others => ' '];
          L   : Identifier_Length := 0;
       begin
-         Id := Buf;
-         Id_Len := L;
          --  Pre guarantees an identifier start here: consume it first, so
          --  every path below has advanced Pos and L is at least 1.
          Buf (1) := Source (Pos);
@@ -436,9 +434,6 @@ is
          Start_Pos : constant Natural := Pos;
       begin
          Ok := False;
-         Attr := (Id      => [others => ' '],
-                  Id_Len  => 0,
-                  Value   => (First => 0, Last => 0));
          while Pos <= Len and then Source (Pos) = ' ' loop
             pragma Loop_Invariant (Pos in 1 .. Len);
             pragma Loop_Invariant (Line_Start <= Pos);
@@ -614,11 +609,6 @@ is
          E  : Natural;
       begin
          Ok := False;
-         G_Kind := Comment;
-         G_Text := (First => 0, Last => 0);
-         G_First := 0;
-         G_End := 0;
-         G_End_Col := 0;
          while H < 4 and then Pos + H <= Len
            and then Source (Pos + H) = '#'
          loop
