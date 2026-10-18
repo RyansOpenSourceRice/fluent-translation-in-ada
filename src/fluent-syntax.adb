@@ -262,12 +262,16 @@ is
       begin
          Id := Buf;
          Id_Len := L;
+         --  Pre guarantees an identifier start here: consume it first, so
+         --  every path below has advanced Pos and L is at least 1.
+         Buf (1) := Source (Pos);
+         L := 1;
+         Pos := Pos + 1;
          while Pos <= Len
            and then Is_Id_Char (Source (Pos))
            and then L < Max_Identifier_Length
          loop
-            pragma Loop_Invariant (Pos >= 1);
-            pragma Loop_Invariant (Pos <= Len + 1);
+            pragma Loop_Invariant (Pos in 1 .. Len + 1);
             pragma Loop_Variant (Increases => Pos);
             L := L + 1;
             Buf (L) := Source (Pos);
@@ -367,36 +371,30 @@ is
         (Span     : in out Text_Span;
          Depth    : in out Depth_Count;
          End_Line : in out Natural;
-         End_Col  : in out Natural;
-         Moved    : out Boolean)
+         End_Col  : in out Natural)
         with Pre  => Source'First = 1
           and then Pos in 1 .. Len + 1
           and then Line >= 1
           and then Line_Start in 1 .. Len + 1
           and then Line_Start <= Pos,
              Post => Pos in 1 .. Len + 1
-               and then (if Moved then Pos > Pos'Old else Pos >= Pos'Old)
-               and then (if not Moved then Span = Span'Old)
-          and then (if not Moved then Depth = Depth'Old)
-          and then Line >= 1
-          and then Line_Start in 1 .. Len + 1
+               and then Pos >= Pos'Old
+               and then Line >= 1
+               and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
       is
          Entry_Pos  : constant Natural := Pos;
-         Work_Span  : Text_Span := Span;
-         Work_Depth : Depth_Count := Depth;
          C          : Character;
       begin
-         Moved := False;
          loop
             pragma Loop_Invariant (Pos in Entry_Pos .. Len + 1);
             pragma Loop_Invariant (Line >= 1);
             pragma Loop_Invariant (Line_Start in 1 .. Len + 1);
             pragma Loop_Invariant (Line_Start <= Pos);
-            pragma Loop_Invariant (if Moved then Pos > Entry_Pos);
             pragma Loop_Variant (Increases => Pos);
             Skip_Blank_Lines;
             exit when Pos > Len;
-            if Work_Depth = 0 then
+            if Depth = 0 then
                exit when Source (Pos) /= ' '
                  and then Source (Pos) /= '{';
                exit when Source (Pos) = ' '
@@ -410,14 +408,8 @@ is
             else
                exit when Source (Pos) = '#';
             end if;
-            Consume_Content_Line (Work_Span, Work_Depth,
-                                  End_Line, End_Col);
-            Moved := True;
+            Consume_Content_Line (Span, Depth, End_Line, End_Col);
          end loop;
-         if Moved then
-            Span := Work_Span;
-            Depth := Work_Depth;
-         end if;
       end Consume_Continuation;
 
       procedure Parse_Attribute
@@ -441,8 +433,7 @@ is
          L         : Identifier_Length := 0;
          Span      : Text_Span := (First => 0, Last => 0);
          Depth     : Depth_Count := 0;
-         Moved     : Boolean;
-         Progress  : Boolean := False;
+         Start_Pos : constant Natural := Pos;
       begin
          Ok := False;
          Attr := (Id      => [others => ' '],
@@ -484,13 +475,9 @@ is
          Skip_Spaces;
          if not At_Hard_EOL (Source, Pos, Len) then
             Consume_Content_Line (Span, Depth, End_Line, End_Col);
-            Progress := True;
          end if;
-         Consume_Continuation (Span, Depth, End_Line, End_Col, Moved);
-         if Moved then
-            Progress := True;
-         end if;
-         if not Progress then
+         Consume_Continuation (Span, Depth, End_Line, End_Col);
+         if Pos = Start_Pos then
             --  No input consumed: cannot be a valid attribute.
             return;
          end if;
@@ -540,8 +527,6 @@ is
          AC          : Natural range 0 .. Max_Attributes_Per_Entry := 0;
          Attr        : Attribute_Node;
          Attr_Ok     : Boolean;
-         Moved       : Boolean;
-         Progress    : Boolean := False;
       begin
          Ok := False;
          if Is_Term then
@@ -559,7 +544,6 @@ is
          Skip_Spaces;
          if not At_Hard_EOL (Source, Pos, Len) then
             Consume_Content_Line (Value, Depth, End_Line, End_Col);
-            Progress := True;
          end if;
          loop
             pragma Loop_Invariant (Pos in Start_Pos .. Len + 1);
@@ -567,10 +551,7 @@ is
             pragma Loop_Invariant (Line_Start in 1 .. Len + 1);
             pragma Loop_Invariant (Line_Start <= Pos);
             pragma Loop_Variant (Increases => Pos);
-            Consume_Continuation (Value, Depth, End_Line, End_Col, Moved);
-            if Moved then
-               Progress := True;
-            end if;
+            Consume_Continuation (Value, Depth, End_Line, End_Col);
             exit when Pos > Len;
             exit when Source (Pos) /= ' ';
             exit when not Attribute_Starts_At (Source, Pos, Len);
@@ -583,9 +564,8 @@ is
             end if;
             AC := AC + 1;
             Local_Attrs (AC) := Attr;
-            Progress := True;
          end loop;
-         if not Progress then
+         if Pos = Start_Pos then
             --  No input consumed: cannot be a valid entry.
             return;
          end if;
