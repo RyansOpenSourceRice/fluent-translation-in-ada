@@ -226,8 +226,10 @@ is
                and then Line_Start <= Pos
       is
          E : Natural;
+         Entry_Pos : constant Natural := Pos;
       begin
          while Pos <= Len and then Line_Is_Blank (Source, Pos, Len) loop
+            pragma Loop_Invariant (Pos >= Entry_Pos);
             pragma Loop_Invariant (Pos in 1 .. Len + 1);
             pragma Loop_Invariant (Line >= 1);
             pragma Loop_Invariant (Line_Start in 1 .. Len + 1);
@@ -265,6 +267,7 @@ is
            and then L < Max_Identifier_Length
          loop
             pragma Loop_Invariant (Pos >= 1);
+            pragma Loop_Invariant (Pos <= Len + 1);
             pragma Loop_Variant (Increases => Pos);
             L := L + 1;
             Buf (L) := Source (Pos);
@@ -334,6 +337,7 @@ is
                and then Pos > Pos'Old
                and then Line >= 1
                and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
       is
          P2 : Natural := Pos;
          E  : Natural;
@@ -431,6 +435,7 @@ is
                and then (if Ok then Pos > Pos'Old)
                and then Line >= 1
                and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
       is
          Buf       : Identifier_Text := [others => ' '];
          L         : Identifier_Length := 0;
@@ -461,6 +466,7 @@ is
            and then L < Max_Identifier_Length
          loop
             pragma Loop_Invariant (Pos >= 1);
+            pragma Loop_Invariant (Pos <= Len + 1);
             pragma Loop_Invariant (Line_Start <= Pos);
             pragma Loop_Variant (Increases => Pos);
             L := L + 1;
@@ -519,6 +525,7 @@ is
                and then (if Ok then Pos > Pos'Old)
                and then Line >= 1
                and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
       is
          Start_Pos   : constant Natural := Pos;
          Start_Line  : constant Natural := Line;
@@ -618,6 +625,7 @@ is
                and then (if Ok then Pos > Pos'Old else Pos = Pos'Old)
                and then Line >= 1
                and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
       is
          H  : Natural := 0;
          Q  : Natural;
@@ -699,6 +707,7 @@ is
                and then J = J'Old + 1
                and then Line >= 1
                and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
       is
          E       : Natural;
          J_First : constant Natural := Line;
