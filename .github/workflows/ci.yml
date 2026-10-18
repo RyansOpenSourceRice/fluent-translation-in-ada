@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: alire-project/setup-alire@v6.0.0
       - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      - run: which gnat || true; gnat --version || true; alr -n toolchain; ls ~/.local/share/alire/toolchains/ 2>/dev/null || true
       - run: alr -n build && eval "$(alr printenv --unix)" && gprbuild -P examples/hello/hello.gpr && gprbuild -P examples/parse/parse.gpr && gprbuild -P examples/fallback/fallback.gpr
   prove:
     runs-on: ubuntu-latest
