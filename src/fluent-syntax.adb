@@ -241,8 +241,8 @@ is
       end Skip_Blank_Lines;
 
       procedure Parse_Identifier
-        (Id     : out Identifier_Text;
-         Id_Len : out Identifier_Length;
+        (Id     : in out Identifier_Text;
+         Id_Len : in out Identifier_Length;
          Ok     : out Boolean)
         with Pre  => Source'First = 1
           and then Pos in 1 .. Len
@@ -257,12 +257,13 @@ is
                and then Line_Start <= Pos
                and then (if Ok then Id_Len >= 1)
       is
-         Buf : Identifier_Text := [others => ' '];
          L   : Identifier_Length := 0;
       begin
          --  Pre guarantees an identifier start here: consume it first, so
          --  every path below has advanced Pos and L is at least 1.
-         Buf (1) := Source (Pos);
+         --  Id comes initialized from the caller; only elements 1 .. L
+         --  are written here and read by callers.
+         Id (1) := Source (Pos);
          L := 1;
          Pos := Pos + 1;
          while Pos <= Len
@@ -272,16 +273,15 @@ is
             pragma Loop_Invariant (Pos in 1 .. Len + 1);
             pragma Loop_Variant (Increases => Pos);
             L := L + 1;
-            Buf (L) := Source (Pos);
+            Id (L) := Source (Pos);
             Pos := Pos + 1;
          end loop;
          if Pos <= Len and then Is_Id_Char (Source (Pos)) then
             Ok := False;
          else
             Ok := True;
-            Id := Buf;
-            Id_Len := L;
          end if;
+         Id_Len := L;
       end Parse_Identifier;
 
       --  Scan First .. Last, tracking placeable nesting depth. Double
@@ -411,7 +411,7 @@ is
       end Consume_Continuation;
 
       procedure Parse_Attribute
-        (Attr     : out Attribute_Node;
+        (Attr     : in out Attribute_Node;
          End_Line : in out Natural;
          End_Col  : in out Natural;
          Ok       : out Boolean)
@@ -427,13 +427,13 @@ is
                and then Line_Start in 1 .. Len + 1
                and then Line_Start <= Pos
       is
-         Buf       : Identifier_Text := [others => ' '];
-         L         : Identifier_Length := 0;
-         Span      : Text_Span := (First => 0, Last => 0);
-         Depth     : Depth_Count := 0;
-         Start_Pos : constant Natural := Pos;
+        L         : Identifier_Length := 0;
+        Span      : Text_Span := (First => 0, Last => 0);
+        Depth     : Depth_Count := 0;
+        Start_Pos : constant Natural := Pos;
       begin
-         Ok := False;
+        Ok := False;
+        Attr.Id_Len := 0;
          while Pos <= Len and then Source (Pos) = ' ' loop
             pragma Loop_Invariant (Pos in 1 .. Len);
             pragma Loop_Invariant (Line_Start <= Pos);
@@ -443,22 +443,28 @@ is
          if Pos > Len or else Source (Pos) /= '.' then
             return;
          end if;
-         Pos := Pos + 1;
-         if Pos > Len or else not Is_Id_Start (Source (Pos)) then
-            return;
-         end if;
-         while Pos <= Len
-           and then Is_Id_Char (Source (Pos))
-           and then L < Max_Identifier_Length
-         loop
-            pragma Loop_Invariant (Pos >= 1);
-            pragma Loop_Invariant (Pos <= Len + 1);
-            pragma Loop_Invariant (Line_Start <= Pos);
-            pragma Loop_Variant (Increases => Pos);
-            L := L + 1;
-            Buf (L) := Source (Pos);
-            Pos := Pos + 1;
-         end loop;
+        Pos := Pos + 1;
+        if Pos > Len or else not Is_Id_Start (Source (Pos)) then
+           return;
+        end if;
+        --  Identifier start verified: consume it first so every path
+        --  below has advanced Pos. Attr.Id comes initialized from the
+        --  caller; only elements 1 .. L are written here.
+        Attr.Id (1) := Source (Pos);
+        L := 1;
+        Pos := Pos + 1;
+        while Pos <= Len
+          and then Is_Id_Char (Source (Pos))
+          and then L < Max_Identifier_Length
+        loop
+           pragma Loop_Invariant (Pos >= 1);
+           pragma Loop_Invariant (Pos <= Len + 1);
+           pragma Loop_Invariant (Line_Start <= Pos);
+           pragma Loop_Variant (Increases => Pos);
+           L := L + 1;
+           Attr.Id (L) := Source (Pos);
+           Pos := Pos + 1;
+        end loop;
          if Pos <= Len and then Is_Id_Char (Source (Pos)) then
             return;
          end if;
@@ -480,17 +486,18 @@ is
             --  Unclosed placeable: the attribute value is invalid.
             return;
          end if;
-         if not Is_Present (Span) then
-            return;
-         end if;
-         Attr := (Id => Buf, Id_Len => L, Value => Span);
-         Ok := True;
+        if not Is_Present (Span) then
+           return;
+        end if;
+        Attr.Id_Len := L;
+        Attr.Value := Span;
+        Ok := True;
       end Parse_Attribute;
 
       procedure Try_Entry
         (Is_Term : Boolean;
          Attach  : Text_Span;
-         Node    : out Entry_Node;
+         Node    : in out Entry_Node;
          Ok      : out Boolean)
         with Pre  => Source'First = 1
           and then Pos in 1 .. Len
@@ -520,7 +527,10 @@ is
          Depth       : Depth_Count := 0;
          Local_Attrs : Attribute_Array (1 .. Max_Attributes_Per_Entry);
          AC          : Natural range 0 .. Max_Attributes_Per_Entry := 0;
-         Attr        : Attribute_Node;
+         Attr        : Attribute_Node :=
+           (Id      => [others => ' '],
+            Id_Len  => 0,
+            Value   => (First => 0, Last => 0));
          Attr_Ok     : Boolean;
       begin
          Ok := False;
@@ -584,11 +594,11 @@ is
       end Try_Entry;
 
       procedure Parse_Comments
-        (G_Kind    : out Comment_Kind;
-         G_Text    : out Text_Span;
-         G_First   : out Natural;
-         G_End     : out Natural;
-         G_End_Col : out Natural;
+        (G_Kind    : in out Comment_Kind;
+         G_Text    : in out Text_Span;
+         G_First   : in out Natural;
+         G_End     : in out Natural;
+         G_End_Col : in out Natural;
          Ok        : out Boolean)
         with Pre  => Source'First = 1
           and then Pos in 1 .. Len
@@ -710,13 +720,13 @@ is
       end Emit_Junk;
 
       C        : Character;
-      Node     : Entry_Node;
+      Node     : Entry_Node := (Kind => Blank, Span => (0, 0, 0, 0));
       Entry_Ok : Boolean;
-      G_Kind   : Comment_Kind;
-      G_Text   : Text_Span;
-      G_First  : Natural;
-      G_End    : Natural;
-      G_Col    : Natural;
+      G_Kind   : Comment_Kind := Comment;
+      G_Text   : Text_Span := (First => 0, Last => 0);
+      G_First  : Natural := 0;
+      G_End    : Natural := 0;
+      G_Col    : Natural := 0;
       G_Ok     : Boolean;
       S_Pos    : Natural;
       S_Line   : Natural;
