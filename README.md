@@ -17,7 +17,7 @@ Requires Alire with GNAT 16. Add the dependency to `alire.toml`:
 fluent_translation_in_ada = "^0.1.0"
 ```
 
-Then build with `alr -n build`. The only runtime crate dependency is
+Then build with `alr -n build`. The only runtime dependency is
 `vss_text` (Unicode strings at the boundary; see `Fluent.Unicode`).
 
 ## Smallest useful example

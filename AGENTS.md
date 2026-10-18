@@ -27,8 +27,9 @@ live in `DESIGN.md` and `SPECIFICATION.md`; this file is behavior.
 
 ## Boundaries
 
-- Pure Ada: no ICU4C, no host FFI, no new crates without a `DESIGN.md`
-  entry. No containers (Podman-only rule applies if that ever changes).
+- Pure Ada: no ICU4C, no host FFI, no new Alire dependencies without a
+  `DESIGN.md` entry. No containers (Podman-only rule applies if that ever
+  changes).
 - No SDK, bindings, or network code without explicit operator approval.
 - Destructive operations (repo deletion, history rewrites on shared
   branches) are operator-only; ask first.

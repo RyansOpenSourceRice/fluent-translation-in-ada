@@ -3,7 +3,7 @@
 This project bundles no third-party source code. It builds against the
 following open-source components, whose licenses require attribution:
 
-## Runtime dependencies (Alire crates)
+## Runtime dependencies (Alire packages)
 
 - **VSS (vss_text 26.2.0)** — AdaCore / contributors.
   Apache License 2.0 with LLVM Exceptions.
