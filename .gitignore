@@ -3,3 +3,14 @@
 
 # Ada Library Information
 *.ali
+
+# Alire build artifacts
+/alire/
+/config/
+/obj/
+/lib/
+/bin/
+
+# GNATprove output
+*.spark
+gnatprove/

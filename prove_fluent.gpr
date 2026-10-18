@@ -1,0 +1,40 @@
+--  Copyright 2026 Ryan
+--  SPDX-License-Identifier: Apache-2.0
+--
+--  prove_fluent.gpr - SPARK Silver proof project (excludes VSS adapter).
+--  GNATprove 16.1 crashes analyzing VSS UCD tables (Storage_Error in
+--  vss-implementation-ucd_core.ads); Fluent.Unicode is SPARK_Mode Off
+--  by design and proven separately by build + manual review.
+
+project Prove_Fluent is
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/prove";
+   for Create_Missing_Dirs use "True";
+   for Excluded_Source_Files use ("fluent-unicode.ads", "fluent-unicode.adb");
+
+   package Naming is
+      for Spec_Suffix ("Ada") use ".ads";
+      for Body_Suffix ("Ada") use ".adb";
+   end Naming;
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022",
+         "-gnatW8",
+         "-gnatwa",
+         "-gnatVa",
+         "-gnata",
+         "-gnato",
+         "-O0");
+   end Compiler;
+
+   package Prove is
+      for Proof_Switches ("Ada") use
+        ("--mode=silver",
+         "--level=2",
+         "--checks-as-errors=on",
+         "--warnings=continue");
+   end Prove;
+
+end Prove_Fluent;
