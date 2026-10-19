@@ -98,13 +98,14 @@ is
    end Line_Is_Blank;
 
    --  True when an attribute (indent "." Identifier "=") starts at the
-   --  indented line beginning at Pos. Never consumes input.
+   --  indented line beginning at Pos. Never consumes input. Total:
+   --  returns False unless Pos begins blank space followed by the
+   --  attribute shape, so callers need no space precondition.
    function Attribute_Starts_At
      (Source : String; Pos : Natural; Len : Len_Bound) return Boolean
      with Pre => Source'First = 1
        and then Source'Length = Len
        and then Pos in 1 .. Len
-       and then Source (Pos) = ' '
    is
       P : Natural := Pos;
    begin
@@ -171,10 +172,23 @@ is
       --  string literals do not count; strings never span lines.
       subtype Depth_Count is Natural range 0 .. Max_Source_Length;
 
-      procedure Skip_Spaces is
+      procedure Skip_Spaces
+        with Pre  => Source'First = 1
+          and then Pos in 1 .. Len + 1
+          and then Line >= 1
+          and then Line_Start in 1 .. Len + 1
+          and then Line_Start <= Pos,
+             Post => Pos in 1 .. Len + 1
+               and then Pos >= Pos'Old
+               and then Line >= 1
+               and then Line_Start in 1 .. Len + 1
+               and then Line_Start <= Pos
+      is
+         Entry_Pos : constant Natural := Pos;
       begin
          while Pos <= Len and then Source (Pos) = ' ' loop
             pragma Loop_Invariant (Pos in 1 .. Len + 1);
+            pragma Loop_Invariant (Pos >= Entry_Pos);
             pragma Loop_Invariant (Line_Start <= Pos);
             pragma Loop_Variant (Increases => Pos);
             Pos := Pos + 1;
@@ -242,7 +256,7 @@ is
 
       procedure Parse_Identifier
         (Id     : in out Identifier_Text;
-         Id_Len : in out Identifier_Length;
+         Id_Len : out Identifier_Length;
          Ok     : out Boolean)
         with Pre  => Source'First = 1
           and then Pos in 1 .. Len
@@ -257,31 +271,46 @@ is
                and then Line_Start <= Pos
                and then (if Ok then Id_Len >= 1)
       is
-         L   : Identifier_Length := 0;
+         L     : Identifier_Length := 0;
+         First : Natural := 1;
+         Cap   : Identifier_Length := Max_Identifier_Length;
+         Remaining : Natural := 1;
       begin
-         --  Pre guarantees an identifier start here: consume it first, so
-         --  every path below has advanced Pos and L is at least 1.
-         --  Id comes initialized from the caller; only elements 1 .. L
-         --  are written here and read by callers.
-         Id (1) := Source (Pos);
+         Ok := False;
+         Id_Len := 0;
+         First := Pos;
          L := 1;
          Pos := Pos + 1;
+         Remaining := Len - First + 1;
+         if Remaining >= Max_Identifier_Length then
+            Cap := Max_Identifier_Length;
+         else
+            Cap := Remaining;
+         end if;
+         --  Scan the identifier without touching Id, so the strictness
+         --  proof never reasons about arrays. L counts consumed characters
+         --  and never exceeds the remaining input, which the copy below
+         --  relies on.
          while Pos <= Len
            and then Is_Id_Char (Source (Pos))
-           and then L < Max_Identifier_Length
+           and then L < Cap
          loop
-            pragma Loop_Invariant (Pos in 1 .. Len + 1);
+            pragma Loop_Invariant (Pos in First + 1 .. Len + 1);
+            pragma Loop_Invariant (L in 1 .. Cap);
+            pragma Loop_Invariant (L = Pos - First);
             pragma Loop_Variant (Increases => Pos);
             L := L + 1;
-            Id (L) := Source (Pos);
             Pos := Pos + 1;
          end loop;
          if Pos <= Len and then Is_Id_Char (Source (Pos)) then
-            Ok := False;
-         else
-            Ok := True;
+            return;
          end if;
+         Ok := True;
          Id_Len := L;
+         for I in 1 .. L loop
+            pragma Loop_Invariant (I in 1 .. L);
+            Id (I) := Source (First + I - 1);
+         end loop;
       end Parse_Identifier;
 
       --  Scan First .. Last, tracking placeable nesting depth. Double
@@ -436,6 +465,7 @@ is
         Attr.Id_Len := 0;
          while Pos <= Len and then Source (Pos) = ' ' loop
             pragma Loop_Invariant (Pos in 1 .. Len);
+            pragma Loop_Invariant (Pos >= Start_Pos);
             pragma Loop_Invariant (Line_Start <= Pos);
             Pos := Pos + 1;
          end loop;
@@ -459,6 +489,7 @@ is
         loop
            pragma Loop_Invariant (Pos >= 1);
            pragma Loop_Invariant (Pos <= Len + 1);
+           pragma Loop_Invariant (Pos >= Start_Pos + 2);
            pragma Loop_Invariant (Line_Start <= Pos);
            pragma Loop_Variant (Increases => Pos);
            L := L + 1;
@@ -551,7 +582,7 @@ is
             Consume_Content_Line (Value, Depth, End_Line, End_Col);
          end if;
          loop
-            pragma Loop_Invariant (Pos in Start_Pos .. Len + 1);
+            pragma Loop_Invariant (Pos in Start_Pos + 1 .. Len + 1);
             pragma Loop_Invariant (Line >= 1);
             pragma Loop_Invariant (Line_Start in 1 .. Len + 1);
             pragma Loop_Invariant (Line_Start <= Pos);
@@ -559,11 +590,18 @@ is
             Consume_Continuation (Value, Depth, End_Line, End_Col);
             exit when Pos > Len;
             exit when Source (Pos) /= ' ';
-            exit when not Attribute_Starts_At (Source, Pos, Len);
-            if AC = Max_Attributes_Per_Entry then
-               return;
-            end if;
-            Parse_Attribute (Attr, End_Line, End_Col, Attr_Ok);
+            --  Bind the probe: the Parse_Attribute pre below reuses this
+            --  equation by congruence instead of re-establishing the call.
+            declare
+               Is_Attr : constant Boolean :=
+                 Attribute_Starts_At (Source, Pos, Len);
+            begin
+               exit when not Is_Attr;
+               if AC = Max_Attributes_Per_Entry then
+                  return;
+               end if;
+               Parse_Attribute (Attr, End_Line, End_Col, Attr_Ok);
+            end;
             if not Attr_Ok then
                return;
             end if;
@@ -613,6 +651,7 @@ is
                and then Line_Start <= Pos
       is
          H  : Natural := 0;
+         Start_Pos : constant Natural := Pos;
          Q  : Natural;
          H2 : Natural;
          Q2 : Natural;
@@ -646,8 +685,15 @@ is
            (if H = 1 then Comment
             elsif H = 2 then Group_Comment
             else Resource_Comment);
+         --  First Consume_Line strictly advanced Pos; cut history so the
+         --  loop and post reason from this single point.
+         pragma Assert_And_Cut (Pos in Start_Pos + 1 .. Len + 1
+           and then Line >= 1
+           and then Line_Start in 1 .. Len + 1
+           and then Line_Start = Pos
+           and then H in 1 .. 3);
          while Pos <= Len and then Source (Pos) = '#' loop
-            pragma Loop_Invariant (Pos in 1 .. Len);
+            pragma Loop_Invariant (Pos in Start_Pos + 1 .. Len);
             pragma Loop_Invariant (Line >= 1);
             pragma Loop_Invariant (Line_Start in 1 .. Len + 1);
             pragma Loop_Invariant (Line_Start <= Pos);
@@ -676,6 +722,7 @@ is
       procedure Emit_Junk
         with Pre  => Source'First = 1
           and then Pos in 1 .. Len
+          and then Entries'First = 1
           and then N < Entries'Length
           and then J <= N
           and then Line >= 1
@@ -690,14 +737,27 @@ is
                and then Line_Start <= Pos
       is
          E       : Natural;
+         Start_Pos : constant Natural := Pos;
+         N_Entry : constant Natural := N;
+         J_Entry : constant Natural := J;
          J_First : constant Natural := Line;
          J_Col   : Natural;
       begin
          E := Line_Ends_At (Source, Pos, Len);
          J_Col := (if E >= Line_Start then E - Line_Start else 0);
          Consume_Line (E);
+         --  First Consume_Line strictly advanced Pos and left Line_Start
+         --  = Pos; cut history so the loop and post reason from here.
+         pragma Assert_And_Cut (Pos in Start_Pos + 1 .. Len + 1
+           and then Line >= 1
+           and then Line_Start in 1 .. Len + 1
+           and then Line_Start = Pos
+           and then N = N_Entry
+           and then J = J_Entry
+           and then N < Entries'Length
+           and then J <= N);
          while Pos <= Len loop
-            pragma Loop_Invariant (Pos in 1 .. Len + 1);
+            pragma Loop_Invariant (Pos in Start_Pos + 1 .. Len + 1);
             pragma Loop_Invariant (Line >= 1);
             pragma Loop_Invariant (Line_Start in 1 .. Len + 1);
             pragma Loop_Invariant (Line_Start <= Pos);
