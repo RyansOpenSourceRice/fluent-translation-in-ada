@@ -2,27 +2,74 @@ name: ci
 on:
   push:
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  # A new push supersedes in-flight runs on the same ref (push + PR sync
+  # otherwise run the same jobs twice).
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pre-commit && pre-commit run --all-files --show-diff-on-failure
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alire-project/setup-alire@v3
-      - run: alr -n build
+      - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      # Fail fast with a clear message if the pinned toolchain is not
+      # usable; `alr exec` resolves via the exact pins in alire.toml and
+      # runs inside the solution environment (no shell PATH needed).
+      - name: Verify pinned toolchain
+        run: |
+          alr -n toolchain
+          alr -n exec -- gnat --version | grep -q "GNAT 16.1.0"
+          alr -n exec -- gprbuild --version
+      # No `eval "$(alr printenv)"` here: setup-alire already exports an
+      # Alire environment from its own resolution, and re-eval'ing a fresh
+      # printenv aborts on the resulting prefix conflicts. `alr build` and
+      # `alr exec` always use the current solution's environment instead.
+      - run: alr -n build && alr -n exec -- gprbuild -P examples/hello/hello.gpr && alr -n exec -- gprbuild -P examples/parse/parse.gpr && alr -n exec -- gprbuild -P examples/fallback/fallback.gpr
   prove:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alire-project/setup-alire@v3
-      - run: alr exec -P1 -- gnatprove -P prove_fluent.gpr --mode=silver --level=2 --checks-as-errors=on --warnings=continue
+      - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      - name: Verify pinned toolchain
+        run: |
+          alr -n toolchain
+          alr -n exec -- gnat --version | grep -q "GNAT 16.1.0"
+          alr -n exec -- gprbuild --version
+      # No `eval "$(alr printenv)"` here (see build job): route everything
+      # through `alr build` / `alr exec`, which use the solution env.
+      - run: alr -n build && alr -n exec -- gnatprove -P prove_fluent.gpr --mode=silver --level=2 --checks-as-errors=on --warnings=continue --timeout=60
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alire-project/setup-alire@v3
-      - run: alr -n build && gprbuild -P tests/tests.gpr && ./bin/test_m0
+      - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      - name: Verify pinned toolchain
+        run: |
+          alr -n toolchain
+          alr -n exec -- gnat --version | grep -q "GNAT 16.1.0"
+          alr -n exec -- gprbuild --version
+      - run: alr -n build && alr -n exec -- gprbuild -P tests/tests.gpr && alr -n exec -- ./bin/test_m0 && alr -n exec -- ./bin/test_m1a
   sast:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: opengrep/opengrep-action@v1
+      - name: Run OpenGrep Security Scan
+        uses: platform-sec/opengrep-action@v2.0.1
+        with:
+          target: "src/"
+          patterns: "auto"
+          severity: "WARNING"
