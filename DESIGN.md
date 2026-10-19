@@ -55,7 +55,13 @@
   `sast` (OpenGrep via `platform-sec/opengrep-action`). No schedules
   (shared-runner capacity); push + PR only. M0 CI never passed
   (wrong `setup-alire` tag, wrong OpenGrep action, missing Alire env in
-  `test`/`prove` jobs); fixed in M1a with verified action tags.
+  `test`/`prove` jobs); fixed in M1a with verified action tags. M1a
+  post-merge: exact toolchain pins in `alire.toml` (`gnat_native`,
+  `gprbuild`, `gnatprove`, `vss_text`) after the solver preferred
+  system gprbuild 2024.1 over the selected 26.0.1, leaving runners
+  without an Ada compiler; `Verify pinned toolchain` fail-fast step in
+  `build`/`prove`/`test`; duplicate push+PR runs cancelled via
+  `concurrency.cancel-in-progress`.
 - Skip reasons: Trivy — no container image or deployed service surface;
   Nyx — no runtime to probe (an FTL parser handles untrusted input but
   there is no running service; OpenGrep + Silver + fixtures are the

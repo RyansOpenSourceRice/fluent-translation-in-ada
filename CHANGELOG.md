@@ -14,6 +14,11 @@
 - Added `examples/parse` and `examples/fallback` (three-example floor).
 - Fixed CI: verified action tags, `pre-commit` gate job, Alire env in
   `prove`/`test` jobs (M0 CI never passed).
+- Fixed CI toolchain: exact release pins (`gnat_native`/`gprbuild`/
+  `gnatprove`/`vss_text`) — the solver previously preferred system
+  gprbuild 2024.1 over the selected 26.0.1, leaving runners without an
+  Ada compiler; fail-fast `Verify pinned toolchain` step in
+  `build`/`prove`/`test`; duplicate runs cancelled via `concurrency`.
 - Changed pre-commit secret scan from Gitleaks to Betterleaks per §8.
 - Added required repo files: `MAINTAINERS.md`, `ROADMAP.md`, `SECURITY.md`,
   `AGENTS.md`, `THIRD_PARTY_NOTICES.md`, `CONTRIBUTING.md`,
