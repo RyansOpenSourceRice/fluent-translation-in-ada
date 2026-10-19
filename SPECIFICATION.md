@@ -18,11 +18,32 @@ Upstream conformance: `https://github.com/projectfluent/fluent`
   `Unsupported_Construct`), `Format_Error` (Kind/Code/Line/Column),
   `Max_Errors = 32`, `Error_List`.
 - `Fluent.Syntax` — `Max_Identifier_Length = 128`,
-  `Max_Pattern_Length = 4096`, `Max_Entries = 512`; `Entry_Kind`
-  (Message/Term/Comment/Blank/Junk); `Entry_Node` discriminated record with
-  `Source_Span`; `Count_Entries(Source) return Natural`
+  `Max_Attributes_Per_Entry = 16`, `Max_Entries = 512`,
+  `Max_Source_Length = 1_000_000`; `Entry_Kind`
+  (Message/Term/Comment/Group_Comment/Resource_Comment/Blank/Junk);
+  `Entry_Node` discriminated record with `Source_Span` and, for
+  messages/terms, identifier text, raw pattern `Text_Span`
+  (`First`/`Last` source indices, `0` = absent), an optional attached
+  `#`-comment span, and up to 16 attributes (identifier plus value
+  span); `Message_Kind`/`Comment_Kind` subtypes;
+  `Count_Entries(Source) return Natural`
   (Pre `Source'Length <= 1_000_000`, Post `Result <= Max_Entries`);
-  `Has_Cr_At_End_Of_Line(Source, Pos) return Boolean`.
+  `Has_Cr_At_End_Of_Line(Source, Pos) return Boolean`;
+  `Parse_Resource(Source, Entries, Count, Junk_Count)`
+  (Pre source length bound, `Source'First = 1`, non-empty caller-sized
+  `Entries`; Post `Count <= Entries'Length`, `Junk_Count <= Count`).
+  Identifiers over 128 characters, a missing `=`, a missing value
+  (terms always require one; messages require a value or at least one
+  valid attribute), or an invalid attribute turns the entry into Junk.
+  A single-`#` comment group directly preceding a successfully parsed
+  message/term attaches to its `Attached_Comment` span. Patterns are
+  raw spans in M1a: a value starts on the `=` line or on following
+  lines; indented continuation lines join unless they start an
+  attribute, start with `.`, `[`, or `*`, or are blank; a `{` line at
+  column 0 joins the span; while brace depth is open every line joins
+  except a column-0 `#` comment; string literals (with `\` escapes) do
+  not affect depth and never span lines. Callers size `Entries` for the
+  input; parsing stops when full.
 - `Fluent.Locale` — `Max_Locale_Tag_Length = 32`; `Locale_Tag`;
   `Make_Tag(Text)` (Pre `Text'Length <= 32` and `Text'First` bounded);
   `Plural_Category` (Zero/One/Two/Few/Many/Other); `Plural_Of(Tag, N)`
@@ -52,12 +73,17 @@ Upstream conformance: `https://github.com/projectfluent/fluent`
 ## 3. Milestones
 
 - M0: this file + contracts + Silver proof (37 checks) + repo floor.
-- M1: full EBNF parser; entry/pattern/placeable coverage vs fixtures.
+- M1a: entry-level parser; entry/attribute/comment structure vs 21
+  all-valid upstream fixtures (entry-kind + identifier sequences);
+  18 pattern-semantic fixtures deferred with reasons, re-enabled in M1b.
+- M1b: full EBNF patterns; entry/pattern/placeable coverage with full
+  structural AST-vs-JSON comparison; invalid patterns become Junk;
+  discontinued variant-list syntax explicitly rejected.
 - M2: resolver (literals, variables `$x`, references, terms `-t`,
   `NUMBER`/`DATETIME`, select, attributes); `fluent-bundle` parity.
 - M3: CLDR plural subset + `langneg`/`fallback` parity vs `Intl.*` goldens.
 
-## 4. Non-goals (M0)
+## 4. Non-goals (M1a)
 
-Full parser, resolver evaluation, number/date formatting, `localize`
-tooling, `wit` bindings.
+Full pattern parsing and validation, resolver evaluation, number/date
+formatting, `localize` tooling, WebAssembly interface-type bindings.

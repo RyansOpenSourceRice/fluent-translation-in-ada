@@ -2,27 +2,46 @@ name: ci
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pre-commit && pre-commit run --all-files --show-diff-on-failure
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alire-project/setup-alire@v3
-      - run: alr -n build
+      - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      - run: which gnat || true; gnat --version || true; alr -n toolchain; ls ~/.local/share/alire/toolchains/ 2>/dev/null || true
+      - run: alr -n build && eval "$(alr printenv --unix)" && gprbuild -P examples/hello/hello.gpr && gprbuild -P examples/parse/parse.gpr && gprbuild -P examples/fallback/fallback.gpr
   prove:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alire-project/setup-alire@v3
-      - run: alr exec -P1 -- gnatprove -P prove_fluent.gpr --mode=silver --level=2 --checks-as-errors=on --warnings=continue
+      - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      - run: alr -n build && eval "$(alr printenv --unix)" && gnatprove -P prove_fluent.gpr --mode=silver --level=2 --checks-as-errors=on --warnings=continue --timeout=60
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: alire-project/setup-alire@v3
-      - run: alr -n build && gprbuild -P tests/tests.gpr && ./bin/test_m0
+      - uses: alire-project/setup-alire@v6.0.0
+      - run: alr -n toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+      - run: alr -n build && eval "$(alr printenv --unix)" && gprbuild -P tests/tests.gpr && ./bin/test_m0 && ./bin/test_m1a
   sast:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: opengrep/opengrep-action@v1
+      - name: Run OpenGrep Security Scan
+        uses: platform-sec/opengrep-action@v2.0.1
+        with:
+          target: "src/"
+          patterns: "auto"
+          severity: "WARNING"

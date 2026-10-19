@@ -1,3 +1,4 @@
+exclude: ^tests/fixtures/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -10,7 +11,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.24.3
+  - repo: https://github.com/betterleaks/betterleaks
+    rev: v1.9.0
     hooks:
-      - id: gitleaks
+      - id: betterleaks

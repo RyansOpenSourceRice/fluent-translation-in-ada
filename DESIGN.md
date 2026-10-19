@@ -22,19 +22,46 @@
   precondition so the `Text'First + K - 1` indexing is provably
   overflow-free.
 - `Count_Entries` is an M0 entry-candidate heuristic (non-indented,
-  non-blank lines); the real EBNF parser lands in M1.
+  non-blank lines); `Parse_Resource` (M1a) is the real entry parser.
+- Patterns are stored as source spans, not copied text: entry nodes stay
+  small on the stack and M1b parses pattern contents from the spans.
+  Removing the copied `Value : Pattern_Text` is a public API change
+  recorded here and in `CHANGELOG.md`.
+- Entry-boundary rules that go beyond the EBNF text but match reference
+  behavior (verified against upstream fixtures): a `{` line at column 0
+  continues/starts a value (multi-line placeables); while brace depth is
+  open, every line continues except a column-0 `#` comment; string
+  literals with `\` escapes do not affect depth and never span lines.
+  Lines starting with `[` or `*` at depth 0 never continue a value
+  (variants belong to selects, parsed in M1b). Invalid patterns still
+  produce entry-boundary mismatches versus the JSON fixtures; those
+  fixtures are deferred to M1b, where validation makes boundaries exact.
+- Single-`#` comment attachment happens only when the following
+  message/term parses successfully; otherwise the group stays standalone
+  and the entry attempt becomes Junk (matches fixtures).
+- Root-directory budget: the tracked root holds 11 files (required
+  planning docs, descriptors, configs) against the 8-file soft budget.
+  The overflow is structural — §29 mandates the files — so the reason is
+  recorded here rather than worked around.
 
 ## CI shape (§29)
 
-- `pre-commit`: codespell + secret scan (gitleaks; satisfies the Betterleaks
-  gate) + whitespace/yaml hooks.
-- GitHub Actions `ci`: `build` (Alire), `prove` (Silver level 2,
-  checks-as-errors), `test` (M0 executable). No schedules (shared-runner
-  capacity); push + PR only.
-- `sast`: OpenGrep job included in CI.
+- `pre-commit`: codespell + secret scan (Betterleaks `AikidoSec/betterleaks
+  @ v1.1.1`, replacing Gitleaks per §8) + whitespace/yaml hooks. The gate
+  runs in CI on every push; it cannot run in this dev environment
+  (sandboxed git cannot fetch hook repos), so CI is the enforcement point.
+- GitHub Actions `ci`: `pre-commit` gate, `build` (Alire), `prove`
+  (Silver level 2, checks-as-errors), `test` (M0 + M1a executables),
+  `sast` (OpenGrep via `platform-sec/opengrep-action`). No schedules
+  (shared-runner capacity); push + PR only. M0 CI never passed
+  (wrong `setup-alire` tag, wrong OpenGrep action, missing Alire env in
+  `test`/`prove` jobs); fixed in M1a with verified action tags.
 - Skip reasons: Trivy — no container image or deployed service surface;
-  Nyx — no release/publish pipeline in M0; Plumbline — no Python/data
-  pipeline surface. Revisit when surfaces appear.
+  Nyx — no runtime to probe (an FTL parser handles untrusted input but
+  there is no running service; OpenGrep + Silver + fixtures are the
+  verification surface; revisit if a service appears); Plumbline — no
+  LLM/agent code; reliability job not applicable. Revisit when surfaces
+  appear.
 
 ## Public API policy
 

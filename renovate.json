@@ -2,10 +2,23 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "automerge": true,
+  "automergeType": "pr",
+  "major": {"automerge": false},
+  "minimumReleaseAge": "7 days",
+  "ignoreScripts": true,
+  "osvVulnerabilityAlerts": true,
+  "pinDigests": true,
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
       "groupName": "github-actions"
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "dev dependencies",
+      "automerge": true
     }
   ]
 }
